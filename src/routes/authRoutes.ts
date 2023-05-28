@@ -4,6 +4,7 @@ import { Router } from "express";
 const router = Router();
 const prisma = new PrismaClient();
 const EMAIL_TOKEN_EXPIRATION_MINUTES = 10;
+const AUTHENTICATION_EXPIRATION_HOURS = 12;
 function generateEmailToken(): string {
   return Math.floor(10000000 + Math.random() * 90000000).toString();
 }
@@ -65,6 +66,26 @@ router.post("/authenticate", async (req, res) => {
   if (dbEmailToken.user.email !== email) {
     return res.sendStatus(401);
   }
-  res.sendStatus(200);
+  const expiration = new Date(
+    new Date().getTime() + AUTHENTICATION_EXPIRATION_HOURS * 60 * 60 * 1000,
+  );
+  const apiToken = await prisma.token.create({
+    data: {
+      type: "API",
+      expiration,
+      user: {
+        connect: {
+          email,
+        },
+      },
+    },
+  });
+  await prisma.token.update({
+    where: { id: dbEmailToken?.id },
+    data: {
+      valid: false,
+    },
+  });
+  //   res.sendStatus(200);
 });
 export default router;
